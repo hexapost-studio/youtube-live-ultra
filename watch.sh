@@ -92,16 +92,12 @@ launch_ytdlp() {
         fi
     done
 
-    # Essayer client Android (contourne restrictions web)
+    # Méthode 1 : pipe yt-dlp → mpv (token toujours frais)
     local extractor_args="--extractor-args youtube:player_client=android,web"
-    HLS_URL=$(yt-dlp -g --format "bestvideo+bestaudio/best" $cookie_args $extractor_args "$URL" 2>/dev/null)
-    if [ -z "$HLS_URL" ]; then
-        HLS_URL=$(yt-dlp -g --format "best" $cookie_args "$URL" 2>/dev/null)
-    fi
+    success "Pipe yt-dlp → mpv (token frais)"
 
-    success "URL HLS extraite via yt-dlp"
-    # shellcheck disable=SC2086
-    exec mpv "${MPV_ARGS[@]}" "$HLS_URL"
+    exec yt-dlp -o - --format "bestvideo+bestaudio/best" $cookie_args $extractor_args "$URL" 2>/dev/null | \
+        mpv "${MPV_ARGS[@]}" -
 }
 
 # ─── FONCTION : lancer via mpv --ytdl (ultime fallback) ──────────────────────
