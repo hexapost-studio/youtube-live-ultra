@@ -92,10 +92,11 @@ launch_ytdlp() {
         fi
     done
 
-    HLS_URL=$(yt-dlp -g --format "bestvideo+bestaudio/best" $cookie_args "$URL" 2>/dev/null)
+    # Essayer client Android (contourne restrictions web)
+    local extractor_args="--extractor-args youtube:player_client=android,web"
+    HLS_URL=$(yt-dlp -g --format "bestvideo+bestaudio/best" $cookie_args $extractor_args "$URL" 2>/dev/null)
     if [ -z "$HLS_URL" ]; then
-        # Dernier essai sans cookies
-        HLS_URL=$(yt-dlp -g --format "best" "$URL" 2>/dev/null)
+        HLS_URL=$(yt-dlp -g --format "best" $cookie_args "$URL" 2>/dev/null)
     fi
 
     success "URL HLS extraite via yt-dlp"
