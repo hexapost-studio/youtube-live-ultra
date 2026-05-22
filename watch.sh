@@ -91,6 +91,20 @@ launch_ytdlp() {
     exec mpv "${MPV_ARGS[@]}" "$HLS_URL"
 }
 
+# ─── FONCTION : lancer via mpv --ytdl (ultime fallback) ──────────────────────
+launch_mpv_ytdl() {
+    progress "mpv --ytdl" "Fallback intégré mpv..."
+
+    exec mpv --ytdl=yes --ytdl-format="bestvideo+bestaudio/best" \
+        --profile=low-latency \
+        --cache=yes --demuxer-max-bytes=2M --demuxer-readahead-secs=0.2 \
+        --video-latency-hacks=yes --framedrop=vo --video-sync=audio \
+        --vd-lavc-threads=4 --audio-buffer=0.2 \
+        --keep-open=no --force-window=yes \
+        "${HW_ARGS[@]}" \
+        "$1"
+}
+
 # ─── LANCEMENT ────────────────────────────────────────────────────────────────
 print_header "${ICON_WATCH}  YouTube Live — Mode Standard" "$YLU_OS / $YLU_ARCH"
 echo ""
@@ -107,16 +121,16 @@ quality=$(echo "$output" | grep -oE '[0-9]+p \(best\)' | grep -oE '[0-9]+p' || e
 
 if [ "$quality" = "1080p" ] || [ "$quality" = "720p" ] || [ "$quality" = "480p" ]; then
     echo -e "  ${C_CYAN}Qualité${C_NC}: $quality détectée"
-    launch_streamlink "best"
-    exit_code=$?
+    if launch_streamlink "best" 2>&1 | grep -q "403\|Forbidden\|Could not open"; then
+        warn_ux "YouTube 403 — IP datacenter bloquée. Fallback yt-dlp..."
+        launch_ytdlp || launch_mpv_ytdl "$URL"
+    fi
 elif [ "$quality" != "unknown" ]; then
-    warn_ux "YouTube throttle — $quality seulement (anti-bot). Fallback yt-dlp..."
-    launch_ytdlp
-    exit_code=$?
+    warn_ux "YouTube throttle — $quality seulement. Fallback yt-dlp..."
+    launch_ytdlp || launch_mpv_ytdl "$URL"
 else
-    warn_ux "Impossible de détecter la qualité. Fallback yt-dlp..."
-    launch_ytdlp
-    exit_code=$?
+    warn_ux "Qualité inconnue. Fallback yt-dlp..."
+    launch_ytdlp || launch_mpv_ytdl "$URL"
 fi
 
 # ─── Retry ────────────────────────────────────────────────────────────────────
