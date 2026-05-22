@@ -83,10 +83,19 @@ launch_streamlink() {
 launch_ytdlp() {
     progress "yt-dlp" "Fallback direct..."
 
-    HLS_URL=$(yt-dlp -g --format "bestvideo+bestaudio/best" "$URL" 2>/dev/null)
+    # Essayer avec cookies navigateur (anti-blocage YouTube)
+    local cookie_args=""
+    for browser in chrome safari firefox; do
+        if yt-dlp --cookies-from-browser "$browser" --print title "$URL" >/dev/null 2>&1; then
+            cookie_args="--cookies-from-browser $browser"
+            break
+        fi
+    done
+
+    HLS_URL=$(yt-dlp -g --format "bestvideo+bestaudio/best" $cookie_args "$URL" 2>/dev/null)
     if [ -z "$HLS_URL" ]; then
-        fail "yt-dlp n'a pas pu extraire l'URL"
-        return 1
+        # Dernier essai sans cookies
+        HLS_URL=$(yt-dlp -g --format "best" "$URL" 2>/dev/null)
     fi
 
     success "URL HLS extraite via yt-dlp"
