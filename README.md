@@ -134,10 +134,10 @@ expose un endpoint WebRTC (ce qu'ils ne font pas publiquement).
 | Paramètre | watch.sh | watch-ultra.sh | Effet |
 |-----------|----------|----------------|-------|
 | `--hls-live-edge` | 2 | 1 | Segments gardés en avance. 1 = latence min (~2-4s), 2 = plus stable |
-| `--hls-segment-threads` | 3 | 4 | Téléchargements parallèles de segments HLS |
+| `--stream-segment-threads` | 3 | 4 | Téléchargements parallèles de segments HLS |
 | `--ringbuffer-size` | 64M | 128M | Buffer mémoire circulaire entre streamlink et mpv |
 | `--hls-live-restart` | non | oui | Redémarre automatiquement si le flux devient stale |
-| `--hls-segment-timeout` | 10s | 5s | Timeout agressif = skip les segments lents au lieu d'attendre |
+| `--stream-segment-timeout` | 10s | 5s | Timeout agressif = skip les segments lents au lieu d'attendre |
 
 **Pourquoi hls-live-edge=1 est le max théorique :** HLS impose au moins 1
 segment d'avance. Si le segment fait 2 secondes, ta latence minimale est de ~2s.

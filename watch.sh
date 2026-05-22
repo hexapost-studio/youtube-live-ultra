@@ -44,14 +44,12 @@ RETRY_MAX=5
 STREAMLINK_ARGS=(
     --loglevel info
     --hls-live-edge "$HLS_LIVE_EDGE"
-    --hls-segment-threads "$SEGMENT_THREADS"
     --stream-segment-threads "$SEGMENT_THREADS"
     --ringbuffer-size "$RINGBUFFER_SIZE"
     --retry-max "$RETRY_MAX"
     --retry-streams 3
-    --hls-segment-queue-threshold 2
-    --hls-segment-timeout 10
-    --hls-timeout 30
+    --stream-segmented-queue-deadline 0.5
+    --stream-segment-timeout 10
 )
 
 # ─── MPV ARGS ────────────────────────────────────────────────────────────────
@@ -90,7 +88,8 @@ stream_retry=0
 
 while [ $stream_retry -lt $MAX_STREAM_RETRIES ]; do
     streamlink "${STREAMLINK_ARGS[@]}" "$URL" best \
-        --player "mpv ${MPV_ARGS[*]}" \
+        --player mpv \
+        --player-args "${MPV_ARGS[*]}" \
         --player-no-close
 
     exit_code=$?

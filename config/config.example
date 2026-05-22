@@ -11,6 +11,9 @@ YLU_HLS_LIVE_EDGE=1
 # Parallel segment download threads
 YLU_HLS_SEGMENT_THREADS=4
 
+# Stream segment timeout in seconds
+YLU_STREAM_SEGMENT_TIMEOUT=5
+
 # Ring buffer size for streamlink → mpv pipe
 YLU_RINGBUFFER_SIZE="128M"
 

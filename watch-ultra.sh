@@ -35,14 +35,12 @@ fi
 STREAMLINK_ARGS=(
     --loglevel warning
     --hls-live-edge 1
-    --hls-segment-threads 4
     --stream-segment-threads 4
     --ringbuffer-size "128M"
     --retry-max 10
     --retry-streams 5
-    --hls-segment-queue-threshold 1
-    --hls-segment-timeout 5
-    --hls-timeout 15
+    --stream-segmented-queue-deadline 0.5
+    --stream-segment-timeout 5
     --hls-live-restart
 )
 
@@ -79,5 +77,6 @@ echo ""
 renice_process -15
 
 streamlink "${STREAMLINK_ARGS[@]}" "$URL" best \
-    --player "mpv ${MPV_ARGS[*]}" \
+    --player mpv \
+    --player-args "${MPV_ARGS[*]}" \
     --player-no-close

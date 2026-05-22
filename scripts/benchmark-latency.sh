@@ -58,12 +58,12 @@ run_bench() {
         BENCH_PID=$!
     elif [ "$mode" = "streamlink-standard" ]; then
         streamlink --loglevel debug --hls-live-edge 2 --ringbuffer-size 64M \
-            "$URL" best --player "mpv --profile=low-latency --length=30 --really-quiet --no-config" \
+            "$URL" best --player mpv --player-args "--profile=low-latency --length=30 --really-quiet --no-config" \
             > "$logfile" 2>&1 &
         BENCH_PID=$!
     elif [ "$mode" = "streamlink-ultra" ]; then
-        streamlink --loglevel debug --hls-live-edge 1 --ringbuffer-size 128M --hls-segment-threads 4 \
-            "$URL" best --player "mpv --profile=low-latency --length=30 --really-quiet --no-config" \
+        streamlink --loglevel debug --hls-live-edge 1 --ringbuffer-size 128M --stream-segment-threads 4 \
+            "$URL" best --player mpv --player-args "--profile=low-latency --length=30 --really-quiet --no-config" \
             > "$logfile" 2>&1 &
         BENCH_PID=$!
     fi
