@@ -21,6 +21,7 @@ usage() {
 
 parse_common_args "$@"
 [ -z "$URL" ] && { usage; exit 1; }
+URL="${URL//\\/}"
 
 missing=()
 command -v yt-dlp >/dev/null 2>&1 || missing+=("yt-dlp")

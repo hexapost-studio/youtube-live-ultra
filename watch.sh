@@ -21,6 +21,9 @@ usage() {
 parse_common_args "$@"
 [ -z "$URL" ] && { usage; exit 1; }
 
+# Nettoyer l'URL (échappements shell accidentels)
+URL="${URL//\\/}"
+
 missing=()
 command -v streamlink >/dev/null 2>&1 || missing+=("streamlink")
 command -v mpv >/dev/null 2>&1 || missing+=("mpv")
