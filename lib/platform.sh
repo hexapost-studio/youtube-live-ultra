@@ -175,7 +175,14 @@ renice_process() {
 # Usage: mpv_hwdec_args
 mpv_hwdec_args() {
     if $YLU_IS_APPLE_SILICON; then
-        echo "--hwdec=videotoolbox --vo=gpu-next --gpu-api=metal --gpu-context=cocoa"
+        # Détecter quelle API GPU est supportée
+        if mpv --gpu-api=help 2>/dev/null | grep -q metal; then
+            echo "--hwdec=videotoolbox --vo=gpu-next --gpu-api=metal --gpu-context=cocoa"
+        elif mpv --gpu-api=help 2>/dev/null | grep -q vulkan; then
+            echo "--hwdec=videotoolbox --vo=gpu-next --gpu-api=vulkan --gpu-context=macvk"
+        else
+            echo "--hwdec=videotoolbox --vo=gpu-next"
+        fi
     elif $YLU_IS_MAC; then
         echo "--hwdec=videotoolbox --vo=libmpv"
     elif $YLU_IS_LINUX; then
