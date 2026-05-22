@@ -18,29 +18,24 @@ usage() {
     echo -e "${C_DIM}Autres modes : watch-ultra.sh | watch-ytdlp.sh | watch-resilient.sh${C_NC}"
 }
 
-# ─── PARSER ──────────────────────────────────────────────────────────────────
 parse_common_args "$@"
 [ -z "$URL" ] && { usage; exit 1; }
 
-# ─── CHECK DEPS ──────────────────────────────────────────────────────────────
 missing=()
 command -v streamlink >/dev/null 2>&1 || missing+=("streamlink")
 command -v mpv >/dev/null 2>&1 || missing+=("mpv")
+command -v yt-dlp >/dev/null 2>&1 || missing+=("yt-dlp")
 if [ ${#missing[@]} -gt 0 ]; then
     fail "Outils manquants : ${missing[*]}"
-    echo ""
-    echo -e "  Installation rapide :"
-    echo -e "    ${C_CYAN}brew install streamlink mpv${C_NC}"
+    echo -e "  ${C_CYAN}brew install streamlink mpv yt-dlp${C_NC}"
     exit 1
 fi
 
-# ─── CONFIG ───────────────────────────────────────────────────────────────────
 HLS_LIVE_EDGE=2
 SEGMENT_THREADS=3
 RINGBUFFER_SIZE="64M"
 RETRY_MAX=5
 
-# ─── STREAMLINK ARGS ─────────────────────────────────────────────────────────
 STREAMLINK_ARGS=(
     --loglevel info
     --hls-live-edge "$HLS_LIVE_EDGE"
@@ -52,7 +47,6 @@ STREAMLINK_ARGS=(
     --stream-segment-timeout 10
 )
 
-# ─── MPV ARGS ────────────────────────────────────────────────────────────────
 HW_DEC=$(mpv_hwdec_args)
 MPV_ARGS=(
     --profile=low-latency
@@ -70,39 +64,76 @@ MPV_ARGS=(
 read -ra HW_ARGS <<< "$HW_DEC"
 MPV_ARGS+=("${HW_ARGS[@]}")
 
+# ─── FONCTION : lancer via streamlink ────────────────────────────────────────
+launch_streamlink() {
+    local quality="${1:-best}"
+    progress "Streamlink" "Résolution en $quality..."
+
+    streamlink "${STREAMLINK_ARGS[@]}" "$URL" "$quality" \
+        --player mpv \
+        --player-args "${MPV_ARGS[*]}" \
+        --player-no-close 2>&1
+    return $?
+}
+
+# ─── FONCTION : lancer via yt-dlp direct ─────────────────────────────────────
+launch_ytdlp() {
+    progress "yt-dlp" "Fallback direct..."
+
+    HLS_URL=$(yt-dlp -g --format "bestvideo+bestaudio/best" "$URL" 2>/dev/null)
+    if [ -z "$HLS_URL" ]; then
+        fail "yt-dlp n'a pas pu extraire l'URL"
+        return 1
+    fi
+
+    success "URL HLS extraite via yt-dlp"
+    # shellcheck disable=SC2086
+    exec mpv "${MPV_ARGS[@]}" "$HLS_URL"
+}
+
 # ─── LANCEMENT ────────────────────────────────────────────────────────────────
 print_header "${ICON_WATCH}  YouTube Live — Mode Standard" "$YLU_OS / $YLU_ARCH"
 echo ""
 echo -e "  ${C_CYAN}URL    ${C_NC}: $URL"
-echo -e "  ${C_CYAN}Mode   ${C_NC}: Standard (hls-live-edge=$HLS_LIVE_EDGE)"
 echo -e "  ${C_CYAN}GPU    ${C_NC}: $(mpv_hwdec_args | cut -c1-50)..."
-echo -e "  ${C_CYAN}Qualité${C_NC}: best (auto)"
-echo ""
-echo -e "  ${C_DIM}Touches : q=quitter  f=plein écran  Shift+I=stats  9/0=volume${C_NC}"
+echo -e "  ${C_DIM}Touches : q=quitter  f=plein écran  Shift+I=stats${C_NC}"
 echo ""
 
 renice_process -10
 
+# ─── Essai 1 : streamlink best ───────────────────────────────────────────────
+output=$(streamlink --loglevel error "$URL" 2>&1 || true)
+quality=$(echo "$output" | grep -oE '[0-9]+p \(best\)' | grep -oE '[0-9]+p' || echo "unknown")
+
+if [ "$quality" = "1080p" ] || [ "$quality" = "720p" ] || [ "$quality" = "480p" ]; then
+    echo -e "  ${C_CYAN}Qualité${C_NC}: $quality détectée"
+    launch_streamlink "best"
+    exit_code=$?
+elif [ "$quality" != "unknown" ]; then
+    warn_ux "YouTube throttle — $quality seulement (anti-bot). Fallback yt-dlp..."
+    launch_ytdlp
+    exit_code=$?
+else
+    warn_ux "Impossible de détecter la qualité. Fallback yt-dlp..."
+    launch_ytdlp
+    exit_code=$?
+fi
+
+# ─── Retry ────────────────────────────────────────────────────────────────────
 MAX_STREAM_RETRIES=3
 stream_retry=0
 
-while [ $stream_retry -lt $MAX_STREAM_RETRIES ]; do
-    streamlink "${STREAMLINK_ARGS[@]}" "$URL" best \
-        --player mpv \
-        --player-args "${MPV_ARGS[*]}" \
-        --player-no-close
-
-    exit_code=$?
-    if [ $exit_code -eq 0 ]; then
-        exit 0
-    fi
-
+while [ $stream_retry -lt $MAX_STREAM_RETRIES ] && [ "${exit_code:-0}" -ne 0 ]; do
     stream_retry=$((stream_retry + 1))
     backoff=$((stream_retry * 2))
-
-    warn_ux "Stream coupé — nouvel essai dans ${backoff}s ($stream_retry/$MAX_STREAM_RETRIES)"
+    warn_ux "Stream coupé — retry ${backoff}s ($stream_retry/$MAX_STREAM_RETRIES)"
     sleep "$backoff"
+
+    launch_streamlink "best"
+    exit_code=$?
 done
 
-fail "Trop de tentatives. Essaie ${C_CYAN}watch-resilient.sh${C_NC} (self-healing)."
-exit 1
+if [ "${exit_code:-0}" -ne 0 ]; then
+    fail "Impossible de lancer le stream. Essaie ${C_CYAN}watch-resilient.sh${C_NC}"
+    exit 1
+fi
