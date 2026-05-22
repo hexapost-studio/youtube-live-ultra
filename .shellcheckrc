@@ -1,0 +1,16 @@
+# shellcheck configuration for youtube-live-ultra
+# Run: shellcheck -x **/*.sh
+
+# We source files and use external binaries
+external-sources=true
+
+# Disable specific warnings:
+# SC2086: Double quote to prevent globbing and word splitting
+#   We know what we're doing with variable expansion in mpv args
+# SC1091: Not following sourced file
+#   We don't want shellcheck tracing our entire system
+# SC2155: Declare and assign separately to avoid masking return values
+#   We use local in functions, which is fine
+# SC2034: Variable appears unused
+#   Some variables are consumed by eval'd or sourced configs
+disable=SC2086,SC1091,SC2155

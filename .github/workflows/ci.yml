@@ -1,0 +1,91 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '**.sh'
+      - 'Makefile'
+      - 'VERSION'
+      - '.github/workflows/ci.yml'
+      - 'tests/**'
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    name: Lint (shellcheck)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run shellcheck
+        uses: ludeeus/action-shellcheck@master
+        with:
+          scandir: '.'
+          format: tty
+          severity: warning
+          additional_files: 'watch*.sh scripts/*.sh'
+
+  syntax:
+    name: Syntax check (bash -n)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check syntax
+        run: |
+          errors=0
+          for f in watch*.sh scripts/*.sh; do
+            echo "Checking $f..."
+            bash -n "$f" || errors=$((errors + 1))
+          done
+          exit $errors
+
+  test:
+    name: Tests (bats)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install bats
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bats
+      - name: Unit tests
+        run: bats --recursive tests/unit/
+      - name: Integration tests
+        run: bats --recursive tests/integration/
+        continue-on-error: true  # Some tests need network, OK if they fail
+
+  version:
+    name: Version check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate version
+        run: |
+          if [ ! -f VERSION ]; then
+            echo "ERROR: VERSION file missing"
+            exit 1
+          fi
+          VERSION=$(cat VERSION)
+          if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "ERROR: VERSION is not semver: $VERSION"
+            exit 1
+          fi
+          echo "Version: $VERSION"
+      - name: Check changelog
+        run: |
+          VERSION=$(cat VERSION)
+          if ! grep -q "$VERSION" CHANGELOG.md; then
+            echo "ERROR: CHANGELOG.md doesn't reference version $VERSION"
+            exit 1
+          fi
+          echo "CHANGELOG references version $VERSION"
+
+  make:
+    name: Makefile targets
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: make check (lint + test)
+        run: make check
+        continue-on-error: true  # tests might need network

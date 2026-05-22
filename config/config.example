@@ -1,0 +1,67 @@
+# =============================================================================
+# youtube-live-ultra configuration
+# Location: ~/.config/youtube-live-ultra/config
+# Override: YLU_* environment variables
+# =============================================================================
+
+# ─── Streamlink ──────────────────────────────────────────────────────────────
+# Number of HLS segments to keep ahead of playback (1 = minimum latency)
+YLU_HLS_LIVE_EDGE=1
+
+# Parallel segment download threads
+YLU_HLS_SEGMENT_THREADS=4
+
+# Ring buffer size for streamlink → mpv pipe
+YLU_RINGBUFFER_SIZE="128M"
+
+# Max streamlink retries before giving up
+YLU_RETRY_MAX=10
+
+# ─── mpv ─────────────────────────────────────────────────────────────────────
+# Demuxer cache: "no" for zero cache, "yes" for minimal buffer
+YLU_MPV_CACHE="no"
+
+# Demuxer max bytes (used when cache=yes)
+YLU_MPV_DEMUXER_MAX_BYTES="500K"
+
+# Demuxer readahead seconds (lower = less latency)
+YLU_MPV_DEMUXER_READAHEAD_SECS="0.05"
+
+# Audio buffer in seconds
+YLU_MPV_AUDIO_BUFFER="0.1"
+
+# Hardware decode: "videotoolbox" (Apple Silicon), "auto", or "no"
+YLU_MPV_HWDEC="videotoolbox"
+
+# Video output driver: "gpu-next" (modern), "gpu", "libmpv"
+YLU_MPV_VO="gpu-next"
+
+# GPU API: "metal" (Apple), "vulkan", "opengl"
+YLU_MPV_GPU_API="metal"
+
+# ─── Resillience ─────────────────────────────────────────────────────────────
+# Watchdog interval in seconds
+YLU_WATCHDOG_INTERVAL=3
+
+# Max retries before watchdog gives up
+YLU_MAX_RETRIES=10
+
+# Backoff base in seconds (doubles each retry)
+YLU_BACKOFF_BASE=2
+
+# ─── Network ─────────────────────────────────────────────────────────────────
+# Preferred DNS servers (space-separated)
+YLU_DNS_SERVERS="1.1.1.1 8.8.8.8"
+
+# TCP receive buffer size in bytes (macOS)
+YLU_TCP_RECVSPACE=4194304
+
+# Disable delayed ACK (Nagle)? 0=off, 1=on (default)
+YLU_TCP_DELAYED_ACK=0
+
+# ─── Logging ─────────────────────────────────────────────────────────────────
+# Log directory
+YLU_LOG_DIR="/tmp/youtube-live-ultra-logs"
+
+# Log level: debug, info, warn, error
+YLU_LOG_LEVEL="info"
