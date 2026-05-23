@@ -20,67 +20,99 @@ CYAN   := \033[0;36m
 NC     := \033[0m
 
 .PHONY: all install uninstall test lint clean check release help
+.PHONY: install-cli install-resilience install-dashboard install-tui install-all
+.PHONY: deps-cli deps-resilience deps-dashboard deps-tui deps-all
 
 all: check test
 
 help:
 	@echo "$(CYAN)youtube-live-ultra v$(VERSION)$(NC)"
 	@echo ""
-	@echo "Targets:"
-	@echo "  make install     Install system-wide ($(BINDIR))"
-	@echo "  make install-user Install for current user only ($(USER_CONFDIR))"
-	@echo "  make uninstall   Remove system-wide installation"
-	@echo "  make test        Run test suite (requires bats)"
-	@echo "  make lint        Run shellcheck on all scripts"
-	@echo "  make check       Run lint + test"
-	@echo "  make clean       Remove build artifacts"
-	@echo "  make release     Tag and push a new release"
+	@echo "Installation (choisis ton tier) :"
+	@echo "  make install-cli         CLI pure (~50 MB)"
+	@echo "  make install-resilience   + Watchdog IPC"
+	@echo "  make install-dashboard    + Dashboard web (stats, chat)"
+	@echo "  make install-tui          + Terminal UI"
+	@echo "  make install-all          Complet (~70 MB)"
+	@echo ""
+	@echo "Développement :"
+	@echo "  make test        Run test suite (bats)"
+	@echo "  make lint        Run shellcheck"
+	@echo "  make check       Lint + test"
+	@echo "  make clean       Remove artifacts"
 	@echo ""
 
-# ─── INSTALL ─────────────────────────────────────────────────────────────────
+# ─── DEPENDENCIES ────────────────────────────────────────────────────────────
 
-install:
-	@echo "$(GREEN)Installing youtube-live-ultra v$(VERSION)...$(NC)"
-	@mkdir -p "$(BINDIR)" "$(CONFDIR)" "$(DOCDIR)"
-	@# Install scripts
-	@for script in $(SCRIPTS); do \
+deps-cli:
+	@echo "$(GREEN)Installation dépendances CLI...$(NC)"
+	@if command -v brew >/dev/null 2>&1; then \
+		brew install streamlink mpv yt-dlp curl; \
+	elif command -v apt-get >/dev/null 2>&1; then \
+		sudo apt-get install -y streamlink mpv yt-dlp curl; \
+	fi
+
+deps-resilience:
+	@echo "$(GREEN)Installation dépendances résilience...$(NC)"
+	@if command -v brew >/dev/null 2>&1; then \
+		brew install socat bc; \
+	elif command -v apt-get >/dev/null 2>&1; then \
+		sudo apt-get install -y socat bc; \
+	fi
+
+deps-dashboard:
+	@echo "$(GREEN)Installation dépendances dashboard...$(NC)"
+	@if command -v brew >/dev/null 2>&1; then \
+		brew install python3; \
+	elif command -v apt-get >/dev/null 2>&1; then \
+		sudo apt-get install -y python3 python3-pip; \
+	fi
+	@pip3 install flask flask-sock
+
+deps-tui:
+	@echo "$(GREEN)Installation dépendances TUI...$(NC)"
+	@if command -v brew >/dev/null 2>&1; then \
+		brew install dialog; \
+	elif command -v apt-get >/dev/null 2>&1; then \
+		sudo apt-get install -y dialog; \
+	fi
+
+deps-all: deps-cli deps-resilience deps-dashboard deps-tui
+
+# ─── INSTALL BY TIER ─────────────────────────────────────────────────────────
+
+install-cli: deps-cli
+	@for script in watch.sh watch-ultra.sh watch-ytdlp.sh; do \
 		cp "$$script" "$(BINDIR)/youtube-live-$$(basename $$script)"; \
 		chmod 755 "$(BINDIR)/youtube-live-$$(basename $$script)"; \
 		echo "  $(GREEN)✓$(NC) $(BINDIR)/youtube-live-$$(basename $$script)"; \
 	done
-	@for helper in $(HELPERS); do \
-		cp "$$helper" "$(BINDIR)/"; \
-		chmod 755 "$(BINDIR)/$$(basename $$helper)"; \
+	@for helper in scripts/health-check.sh scripts/optimize-network.sh scripts/benchmark-latency.sh; do \
+		cp "$$helper" "$(BINDIR)/"; chmod 755 "$(BINDIR)/$$(basename $$helper)"; \
 		echo "  $(GREEN)✓$(NC) $(BINDIR)/$$(basename $$helper)"; \
 	done
-	@# Install config
-	@cp config/mpv.conf "$(CONFDIR)/mpv.conf"
-	@echo "  $(GREEN)✓$(NC) $(CONFDIR)/mpv.conf"
-	@# Install docs
-	@cp README.md CHANGELOG.md "$(DOCDIR)/"
-	@echo "  $(GREEN)✓$(NC) Documentation installed"
-	@echo ""
-	@echo "$(GREEN)Installation complete.$(NC)"
-	@echo "  Run: youtube-live-watch.sh <URL>"
+	@mkdir -p "$(CONFDIR)" && cp config/mpv.conf "$(CONFDIR)/"
+	@echo "$(GREEN)CLI installé. Lance : youtube-live-watch.sh <URL>$(NC)"
 
-install-user:
-	@echo "$(GREEN)Installing for current user...$(NC)"
-	@mkdir -p "$(USER_CONFDIR)"
-	@cp config/mpv.conf "$(USER_CONFDIR)/mpv.conf" 2>/dev/null || true
-	@echo "  $(GREEN)✓$(NC) Config: $(USER_CONFDIR)/"
-	@echo "  Run from project directory: ./watch.sh <URL>"
-	@echo "  Or add to PATH: export PATH=\"$(PWD):\$$PATH\""
+install-resilience: install-cli deps-resilience
+	@cp watch-resilient.sh "$(BINDIR)/youtube-live-watch-resilient.sh"
+	@chmod 755 "$(BINDIR)/youtube-live-watch-resilient.sh"
+	@echo "$(GREEN)Résilience installée. Lance : youtube-live-watch-resilient.sh <URL> --mode ultra$(NC)"
 
-uninstall:
-	@echo "$(RED)Uninstalling youtube-live-ultra...$(NC)"
-	@for script in $(SCRIPTS); do \
-		rm -f "$(BINDIR)/youtube-live-$$(basename $$script)"; \
-	done
-	@for helper in $(HELPERS); do \
-		rm -f "$(BINDIR)/$$(basename $$helper)"; \
-	done
-	@rm -rf "$(CONFDIR)" "$(DOCDIR)"
-	@echo "$(RED)Uninstall complete.$(NC)"
+install-dashboard: install-resilience deps-dashboard
+	@cp watch-dashboard.sh "$(BINDIR)/youtube-live-watch-dashboard.sh"
+	@chmod 755 "$(BINDIR)/youtube-live-watch-dashboard.sh"
+	@cp -r dashboard "$(CONFDIR)/dashboard"
+	@echo "$(GREEN)Dashboard installé. Lance : youtube-live-watch-dashboard.sh <URL>$(NC)"
+
+install-tui: install-resilience deps-tui
+	@echo "$(GREEN)TUI — à venir (watch-tui.sh)$(NC)"
+
+install-all: install-dashboard install-tui
+	@echo "$(GREEN)✅ Installation complète$(NC)"
+
+# ─── SYSTEM INSTALL ──────────────────────────────────────────────────────────
+install: install-all
 
 # ─── TEST ────────────────────────────────────────────────────────────────────
 
