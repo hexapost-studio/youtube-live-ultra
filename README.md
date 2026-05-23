@@ -7,27 +7,42 @@
 [![Version](https://img.shields.io/badge/version-1.0.0-blue)](https://github.com/hexapost-studio/youtube-live-ultra/releases)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-Projet conçu pour Mac Apple Silicon (M2) — adaptable Linux/Windows.
+**Tu n'installes que ce dont tu as besoin.** 4 tiers indépendants, du CLI pur au dashboard web.
 
 ---
 
-## ⚡ Quick Start
+## 🎯 Vision produit
 
-### Installation pro (Homebrew)
-```bash
-brew install hexapost-studio/tap/youtube-live-ultra
-youtube-live-watch "https://www.youtube.com/watch?v=XXXXXXXXXXX"
+```
+Tier 1 : CLI Pure (~50 MB)       → « Juste regarder un live »
+Tier 2 : + Résilience (+5 MB)    → « Ne jamais couper »
+Tier 3 : + Dashboard (+15 MB)    → « Stats, chat, interface »
+Tier 4 : + TUI (+0 MB)           → « SSH, pas de navigateur »
 ```
 
-### Installation depuis les sources
+[Voir PRODUCT.md pour le détail](PRODUCT.md)
+
+---
+
+## ⚡ Installation
+
 ```bash
 git clone https://github.com/hexapost-studio/youtube-live-ultra.git
 cd youtube-live-ultra
-make check          # Lint + tests
-make install        # Installation système
-# ou
-brew install streamlink mpv yt-dlp  # dépendances
-./watch.sh "https://www.youtube.com/watch?v=XXXXXXXXXXX"
+./install.sh          # Mode interactif (choisis ton tier)
+```
+
+**Ou directement :**
+```bash
+./install.sh --cli         # Tier 1 : juste le minimum
+./install.sh --dashboard   # Tiers 1+2+3 : tout sauf TUI
+./install.sh --all         # Tout installer
+```
+
+**Via Homebrew (une seule commande) :**
+```bash
+brew install hexapost-studio/tap/youtube-live-ultra
+youtube-live-watch "https://www.youtube.com/watch?v=XXXXXXXXXXX"
 ```
 
 ---
