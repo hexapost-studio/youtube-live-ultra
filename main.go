@@ -135,7 +135,8 @@ func launchYtdlpPipe(url string, mpvArgs []string) error {
 	ytdlp.Stderr = nil
 	stdout, err := ytdlp.StdoutPipe()
 	if err != nil { return err }
-	ytdlp.Start()
+	if err := ytdlp.Start(); err != nil { return err }
+	defer func() { ytdlp.Wait() }() // Évite le zombie si mpv meurt
 
 	mpv := exec.Command("mpv", append(mpvArgs, "-")...)
 	mpv.Stdin = stdout
@@ -351,6 +352,8 @@ func sandboxWrap(cmd *exec.Cmd) *exec.Cmd {
 			cmd.Args = append([]string{"bwrap", "--ro-bind", "/usr", "/usr",
 				"--dev", "/dev", "--tmpfs", "/tmp", "--unshare-all", "--share-net"}, cmd.Args...)
 			cmd.Path, _ = exec.LookPath("bwrap")
+		} else {
+			fmt.Fprintln(os.Stderr, "⚠ --sandbox demandé mais ni firejail ni bwrap trouvé. Installe l'un des deux.")
 		}
 	}
 	return cmd
@@ -360,8 +363,7 @@ func sandboxWrap(cmd *exec.Cmd) *exec.Cmd {
 
 func detectHWDec() []string {
 	if runtime.GOOS == "darwin" {
-		if _, err := exec.LookPath("mpv"); err == nil {
-			out, _ := exec.Command("mpv", "--gpu-api=help").Output()
+		if out, err := exec.Command("mpv", "--gpu-api=help").Output(); err == nil {
 			if strings.Contains(string(out), "metal") {
 				return []string{"--hwdec=videotoolbox", "--vo=gpu-next", "--gpu-api=metal", "--gpu-context=cocoa"}
 			} else if strings.Contains(string(out), "vulkan") {
