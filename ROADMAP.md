@@ -47,6 +47,9 @@ Go aurait du sens si :
 En attendant, `ylu` (Python stdlib, 350 lignes) couvre déjà 80% des cas.
 Priorité v1.1 → v1.3 : features et robustesse, pas de rewrite.
 
+Le port Go vit sur la branche [`go`](https://github.com/hexapost-studio/youtube-live-ultra/tree/go)
+— aucune modification de `main` avant que les conditions soient remplies.
+
 ## Idées futures
 - [ ] Intégration OBS (source basse latence)
 - [ ] YouTube live chat interactif (envoi de messages)
