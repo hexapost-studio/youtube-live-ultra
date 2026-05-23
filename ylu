@@ -1,0 +1,270 @@
+#!/usr/bin/env python3
+"""
+youtube-live-ultra — ylu : CLI unifiée Python.
+Remplace tous les scripts Bash par une seule commande.
+
+Usage:
+  ylu watch <URL>              → Mode standard (ex watch.sh)
+  ylu watch <URL> --ultra      → Mode ultra (ex watch-ultra.sh)
+  ylu watch <URL> --direct     → Mode direct (ex watch-ytdlp.sh)
+  ylu watch <URL> --resilient  → Mode résilient (ex watch-resilient.sh)
+  ylu dashboard <URL>          → Dashboard web (ex watch-dashboard.sh)
+  ylu tui <URL>                → TUI curses (ex watch-tui.sh)
+  ylu check <URL>              → Health check (ex health-check.sh)
+  ylu optimize                 → Diagnostic réseau
+  ylu install                  → Installation interactive
+
+Python 3.7+ stdlib only. Zero pip dependencies for CLI core.
+"""
+import sys, os, json, time, socket, signal, subprocess, threading, argparse, shutil, platform as _platform
+
+VERSION = "1.0.0"
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# ─── OS DETECTION ────────────────────────────────────────────────────────────
+def detect_os():
+    s = _platform.system()
+    m = _platform.machine()
+    if s == "Darwin":
+        return ("macos", "arm64" if m == "arm64" else "x86_64")
+    elif s == "Linux":
+        try:
+            with open("/proc/version") as f:
+                if "microsoft" in f.read().lower():
+                    return ("wsl", m)
+        except: pass
+        return ("linux", m)
+    return (s.lower(), m)
+
+OS_NAME, OS_ARCH = detect_os()
+
+def mpv_hwdec_args():
+    """Detect best hardware decode args."""
+    if OS_NAME == "macos" and OS_ARCH == "arm64":
+        try:
+            r = subprocess.run(["mpv", "--gpu-api=help"], capture_output=True, text=True, timeout=3)
+            if "metal" in r.stdout:
+                return ["--hwdec=videotoolbox", "--vo=gpu-next", "--gpu-api=metal", "--gpu-context=cocoa"]
+            elif "vulkan" in r.stdout:
+                return ["--hwdec=videotoolbox", "--vo=gpu-next", "--gpu-api=vulkan", "--gpu-context=macvk"]
+        except: pass
+        return ["--hwdec=videotoolbox", "--vo=gpu-next"]
+    elif OS_NAME == "macos":
+        return ["--hwdec=videotoolbox", "--vo=libmpv"]
+    elif OS_NAME in ("linux", "wsl"):
+        try:
+            subprocess.run(["vainfo"], capture_output=True, timeout=3)
+            return ["--hwdec=vaapi", "--vo=gpu-next"]
+        except: pass
+        return ["--hwdec=auto-safe", "--vo=gpu-next"]
+    return ["--hwdec=auto-safe", "--vo=gpu-next"]
+
+# ─── ARGUMENTS ───────────────────────────────────────────────────────────────
+def build_parser():
+    p = argparse.ArgumentParser(prog="ylu", description="YouTube Live Ultra — latence minimale, résolution maximale")
+    p.add_argument("--version", action="version", version=f"ylu v{VERSION} ({OS_NAME}/{OS_ARCH})")
+    sub = p.add_subparsers(dest="command")
+
+    # watch
+    w = sub.add_parser("watch", help="Regarder un live")
+    w.add_argument("url", help="URL YouTube live")
+    w.add_argument("--mode", choices=["standard","ultra","direct","resilient"], default="standard")
+    w.add_argument("--dry-run", action="store_true")
+    w.add_argument("--verbose", "-v", action="store_true")
+
+    # dashboard
+    d = sub.add_parser("dashboard", help="Dashboard web (stats + chat)")
+    d.add_argument("url")
+    d.add_argument("--port", type=int, default=9191)
+    d.add_argument("--mode", choices=["standard","ultra"], default="standard")
+
+    # tui
+    t = sub.add_parser("tui", help="TUI curses")
+    t.add_argument("url")
+    t.add_argument("--mode", choices=["standard","ultra"], default="standard")
+
+    # check
+    c = sub.add_parser("check", help="Health check pipeline")
+    c.add_argument("url", nargs="?")
+
+    # optimize
+    sub.add_parser("optimize", help="Diagnostic réseau")
+
+    # install
+    sub.add_parser("install", help="Installation interactive")
+
+    return p
+
+# ─── COMMANDS ────────────────────────────────────────────────────────────────
+
+def cmd_watch(args):
+    """Launch stream with mpv."""
+    _check_binaries("streamlink", "mpv", "yt-dlp")
+    
+    # mpv base args
+    mpv_args = ["--profile=low-latency", "--keep-open=no", "--force-window=yes",
+                "--video-latency-hacks=yes", "--framedrop=vo", "--video-sync=audio",
+                "--vd-lavc-threads=4", "--audio-buffer=0.2"] + mpv_hwdec_args()
+
+    mode_settings = {
+        "standard": {"cache": "yes", "demuxer_max_bytes": "2M", "readahead": "0.2", "edge": 2},
+        "ultra": {"cache": "no", "demuxer_max_bytes": "500K", "readahead": "0.05", "edge": 1, "extra": ["--framedrop=vo+decoder", "--video-sync=display-resample", "--vd-lavc-threads=6", "--audio-buffer=0.1", "--osc=no"]},
+        "direct": {"cache": "no", "demuxer_max_bytes": "500K", "readahead": "0.05", "edge": 1, "extra": ["--framedrop=vo+decoder", "--video-sync=display-resample", "--vd-lavc-threads=6", "--audio-buffer=0.1", "--osc=no", "--cache-secs=0"]},
+        "resilient": {"cache": "yes", "demuxer_max_bytes": "2M", "readahead": "0.2", "edge": 2},
+    }
+    s = mode_settings[args.mode]
+    mpv_args.extend(["--cache=" + s["cache"], "--demuxer-max-bytes=" + s["demuxer_max_bytes"],
+                     "--demuxer-readahead-secs=" + s["readahead"]])
+    if "extra" in s: mpv_args.extend(s["extra"])
+
+    print(f"🎬 YouTube Live Ultra — {args.mode.title()} mode")
+    print(f"   URL: {args.url}")
+    print(f"   OS:  {OS_NAME}/{OS_ARCH}")
+    if args.dry_run:
+        print("   DRY RUN — pas de lancement.")
+        return
+
+    # Try streamlink first, then yt-dlp, then mpv --ytdl
+    strategies = [
+        lambda: _launch_streamlink(args.url, mpv_args, s["edge"]),
+        lambda: _launch_ytdlp_pipe(args.url, mpv_args),
+        lambda: _launch_mpv_ytdl(args.url, mpv_args),
+    ]
+
+    if args.mode == "resilient":
+        _launch_resilient(args.url, mpv_args, s["edge"])
+    elif args.mode == "direct":
+        strategies[1]()  # yt-dlp direct only
+    else:
+        for i, strategy in enumerate(strategies):
+            try:
+                strategy()
+                break
+            except Exception as e:
+                if args.verbose:
+                    print(f"   Strategy {i+1} failed: {e}")
+                if i == len(strategies) - 1:
+                    print("   ❌ All strategies failed.")
+                    sys.exit(1)
+
+def _launch_streamlink(url, mpv_args, edge):
+    """Streamlink → mpv."""
+    player_args = " ".join(mpv_args)
+    cmd = ["streamlink", "--loglevel", "info", "--hls-live-edge", str(edge),
+           "--stream-segment-threads", "3", "--ringbuffer-size", "64M",
+           "--retry-max", "5", "--retry-streams", "3",
+           url, "best", "--player", "mpv", "--player-args", player_args, "--player-no-close"]
+    os.execvp("streamlink", cmd)
+
+def _launch_ytdlp_pipe(url, mpv_args):
+    """yt-dlp pipe → mpv."""
+    ytdlp = subprocess.Popen(
+        ["yt-dlp", "-o", "-", "--format", "bestvideo+bestaudio/best",
+         "--extractor-args", "youtube:player_client=android,web", url],
+        stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+    os.execvp("mpv", ["mpv"] + mpv_args + ["-"])
+
+def _launch_mpv_ytdl(url, mpv_args):
+    """mpv --ytdl=yes."""
+    os.execvp("mpv", ["mpv", "--ytdl=yes", "--ytdl-format=bestvideo+bestaudio/best"] + mpv_args + [url])
+
+def _launch_resilient(url, mpv_args, edge):
+    """Resilient mode with watchdog IPC."""
+    ipc = f"/tmp/mpv-ylu-{os.getpid()}"
+    mpv = subprocess.Popen(
+        ["mpv", f"--input-ipc-server={ipc}", "--ytdl=yes",
+         "--ytdl-format=bestvideo+bestaudio/best"] + mpv_args + [url])
+    print(f"   Watchdog actif (IPC: {ipc})")
+    _watchdog(mpv.pid, ipc, url, mpv_args, edge)
+
+def _watchdog(pid, ipc, url, mpv_args, edge):
+    """Monitor mpv via IPC, restart on freeze."""
+    last_pos = None
+    frozen = 0
+    while True:
+        time.sleep(3)
+        try:
+            os.kill(pid, 0)
+        except OSError:
+            code = os.waitpid(pid, os.WNOHANG)[1] if os.waitpid(pid, os.WNOHANG)[0] else 0
+            if code == 0: return
+            print(f"   ⚠ mpv crashed (exit {code}) — restarting...")
+            _launch_streamlink(url, mpv_args, edge)
+            return
+        # IPC health check
+        try:
+            s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            s.settimeout(0.5); s.connect(ipc)
+            s.send(b'{"command":["get_property","time-pos"]}\n')
+            r = json.loads(s.recv(4096).decode().strip().split("\n")[0])
+            s.close()
+            pos = r.get("data")
+            if pos == last_pos:
+                frozen += 1
+                if frozen >= 3:
+                    print(f"   ❌ mpv frozen — killing & restarting...")
+                    os.kill(pid, signal.SIGTERM)
+                    time.sleep(1)
+                    _launch_streamlink(url, mpv_args, edge)
+                    return
+            else:
+                frozen = 0
+            last_pos = pos
+        except: pass
+
+def cmd_dashboard(args):
+    """Launch dashboard."""
+    _check_binaries("mpv", "yt-dlp")
+    sys.path.insert(0, os.path.join(SCRIPT_DIR, "dashboard"))
+    from server import main as dash_main
+    sys.argv = ["dashboard", args.url, "--port", str(args.port), "--mode", args.mode]
+    dash_main()
+
+def cmd_tui(args):
+    """Launch TUI."""
+    _check_binaries("mpv", "yt-dlp")
+    sys.path.insert(0, os.path.join(SCRIPT_DIR, "dashboard"))
+    from tui import main as tui_main
+    sys.argv = ["tui", args.url, "--mode", args.mode]
+    tui_main()
+
+def cmd_check(args):
+    """Health check."""
+    script = os.path.join(SCRIPT_DIR, "scripts", "health-check.sh")
+    if os.path.exists(script):
+        os.execvp("bash", ["bash", script, args.url or ""])
+
+def cmd_optimize(args):
+    """Network diagnostic."""
+    script = os.path.join(SCRIPT_DIR, "scripts", "optimize-network.sh")
+    if os.path.exists(script):
+        os.execvp("bash", ["bash", script])
+
+def cmd_install(args):
+    """Interactive install."""
+    script = os.path.join(SCRIPT_DIR, "install.sh")
+    if os.path.exists(script):
+        os.execvp("bash", ["bash", script])
+
+# ─── HELPERS ─────────────────────────────────────────────────────────────────
+
+def _check_binaries(*names):
+    missing = [n for n in names if not shutil.which(n)]
+    if missing:
+        print(f"❌ Outils manquants : {' '.join(missing)}")
+        print(f"   brew install {' '.join(missing)}")
+        sys.exit(1)
+
+# ─── MAIN ────────────────────────────────────────────────────────────────────
+
+def main():
+    parser = build_parser()
+    args = parser.parse_args()
+    if not args.command:
+        parser.print_help()
+        return
+    {"watch": cmd_watch, "dashboard": cmd_dashboard, "tui": cmd_tui,
+     "check": cmd_check, "optimize": cmd_optimize, "install": cmd_install}[args.command](args)
+
+if __name__ == "__main__":
+    main()

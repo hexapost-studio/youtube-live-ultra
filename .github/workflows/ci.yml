@@ -3,12 +3,6 @@ name: CI
 on:
   push:
     branches: [main]
-    paths:
-      - '**.sh'
-      - 'Makefile'
-      - 'VERSION'
-      - '.github/workflows/ci.yml'
-      - 'tests/**'
   pull_request:
     branches: [main]
 
@@ -24,68 +18,57 @@ jobs:
           scandir: '.'
           format: tty
           severity: warning
-          additional_files: 'watch*.sh scripts/*.sh'
+          additional_files: 'watch*.sh scripts/*.sh lib/*.sh install.sh'
 
-  syntax:
-    name: Syntax check (bash -n)
+  syntax-bash:
+    name: Syntax (bash -n)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Check syntax
-        run: |
-          errors=0
-          for f in watch*.sh scripts/*.sh; do
-            echo "Checking $f..."
-            bash -n "$f" || errors=$((errors + 1))
-          done
-          exit $errors
+      - run: for f in watch*.sh scripts/*.sh lib/*.sh install.sh; do bash -n "$f" || exit 1; done
+
+  syntax-python:
+    name: Syntax (Python)
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 -m py_compile dashboard/server.py dashboard/tui.py ylu
 
   test:
     name: Tests (bats)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install bats
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y bats
-      - name: Unit tests
-        run: bats --recursive tests/unit/
-      - name: Integration tests
-        run: bats --recursive tests/integration/
-        continue-on-error: true  # Some tests need network, OK if they fail
+      - run: sudo apt-get update && sudo apt-get install -y bats
+      - run: bats --recursive tests/unit/
+      - run: bats --recursive tests/integration/ || true
+
+  test-macos:
+    name: Tests (macOS)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: brew install bats-core
+      - run: bats --recursive tests/unit/
 
   version:
     name: Version check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Validate version
-        run: |
-          if [ ! -f VERSION ]; then
-            echo "ERROR: VERSION file missing"
-            exit 1
-          fi
+      - run: |
           VERSION=$(cat VERSION)
-          if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
-            echo "ERROR: VERSION is not semver: $VERSION"
-            exit 1
-          fi
-          echo "Version: $VERSION"
-      - name: Check changelog
-        run: |
-          VERSION=$(cat VERSION)
-          if ! grep -q "$VERSION" CHANGELOG.md; then
-            echo "ERROR: CHANGELOG.md doesn't reference version $VERSION"
-            exit 1
-          fi
-          echo "CHANGELOG references version $VERSION"
+          echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$' || exit 1
+          grep -q "$VERSION" CHANGELOG.md || exit 1
 
-  make:
-    name: Makefile targets
+  ylu-cli:
+    name: ylu CLI (smoke)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: make check (lint + test)
-        run: make check
-        continue-on-error: true  # tests might need network
+      - run: python3 ylu --version
+      - run: python3 ylu --help
+      - run: python3 ylu watch --help
