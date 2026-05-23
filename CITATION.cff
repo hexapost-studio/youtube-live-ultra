@@ -1,0 +1,24 @@
+# Citation
+
+If you use youtube-live-ultra in academic research, please cite:
+
+```bibtex
+@software{youtube_live_ultra,
+  author = {Aymeric, hexapost-studio},
+  title = {YouTube Live Ultra — Low-latency YouTube live streaming tool},
+  year = {2026},
+  version = {1.0.0},
+  url = {https://github.com/hexapost-studio/youtube-live-ultra},
+  note = {Uses HLS edge=1 with mpv hardware decode for 2-5x lower latency
+          than the YouTube web player. Triple fallback architecture
+          (streamlink → yt-dlp → mpv --ytdl).}
+}
+```
+
+## Related academic references
+
+The project builds on:
+
+- Bentaleb, Begen, Zimmermann et al. "Toward One-Second Latency: Evolution of Live Media Streaming." IEEE COMST 2025. [arXiv:2310.03256](https://arxiv.org/abs/2310.03256)
+- Liu, Jia, Jiang, Zhang et al. "Camel: Frame-Level Bandwidth Estimation for Low-Latency Live Streaming." WWW 2026. [arXiv:2602.09500](https://arxiv.org/abs/2602.09500)
+- Menon, Zhu, Rajendran et al. "Optimal Quality and Efficiency in Adaptive Live Streaming with JND-Aware Low Latency Encoding." MHV 2024. [arXiv:2401.15343](https://arxiv.org/abs/2401.15343)
