@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ title }}</title>
+<style>
+:root {
+  --bg: #0a0a0f;
+  --surface: #14141f;
+  --border: #1e1e30;
+  --text: #c8c8d4;
+  --muted: #6b6b80;
+  --accent: #22c55e;
+  --warn: #f59e0b;
+  --danger: #ef4444;
+  --blue: #3b82f6;
+  --radius: 8px;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro', sans-serif;
+  background: var(--bg); color: var(--text);
+  height: 100vh; overflow: hidden;
+}
+.app { display:flex; height:100vh; }
+.main { flex:1; display:flex; flex-direction:column; min-width:0; }
+.topbar {
+  display:flex; align-items:center; gap:12px; padding:12px 16px;
+  background: var(--surface); border-bottom:1px solid var(--border);
+  flex-shrink:0;
+}
+.topbar h1 { font-size:16px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.topbar .badge {
+  font-size:11px; padding:2px 8px; border-radius:10px;
+  background: var(--accent); color:#000; font-weight:600;
+  white-space:nowrap;
+}
+.topbar .badge.off { background: var(--danger); }
+.spacer { flex:1; }
+.btn {
+  padding:6px 14px; border-radius:var(--radius); border:1px solid var(--border);
+  background: var(--surface); color: var(--text); cursor:pointer;
+  font-size:13px; transition:all .15s;
+}
+.btn:hover { background: #222; border-color: #333; }
+.btn.primary { background: var(--blue); border-color: var(--blue); color:#fff; }
+.btn.danger { background: var(--danger); border-color: var(--danger); color:#fff; }
+.stats {
+  display:grid; grid-template-columns: repeat(auto-fit, minmax(140px,1fr));
+  gap:8px; padding:12px 16px; flex-shrink:0;
+}
+.stat {
+  background: var(--surface); border:1px solid var(--border);
+  border-radius: var(--radius); padding:10px 14px;
+}
+.stat .label { font-size:11px; color: var(--muted); text-transform:uppercase; letter-spacing:.5px; }
+.stat .value { font-size:20px; font-weight:700; font-variant-numeric:tabular-nums; }
+.stat .value.green { color: var(--accent); }
+.stat .value.yellow { color: var(--warn); }
+.stat .value.red { color: var(--danger); }
+.video-area {
+  flex:1; display:flex; align-items:center; justify-content:center;
+  color: var(--muted); font-size:14px;
+}
+.chat {
+  width:320px; background: var(--surface); border-left:1px solid var(--border);
+  display:flex; flex-direction:column; flex-shrink:0;
+}
+.chat-header {
+  padding:12px 16px; border-bottom:1px solid var(--border);
+  font-weight:600; font-size:14px;
+}
+.chat-messages {
+  flex:1; overflow-y:auto; padding:8px;
+  display:flex; flex-direction:column; gap:4px;
+}
+.chat-msg {
+  font-size:13px; line-height:1.4; padding:4px 8px;
+  border-radius:4px; background: rgba(255,255,255,0.03);
+  animation: fadeIn .3s ease;
+}
+.chat-msg .time { font-size:10px; color: var(--muted); margin-right:6px; }
+@keyframes fadeIn { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
+.chat-placeholder {
+  flex:1; display:flex; align-items:center; justify-content:center;
+  color: var(--muted); font-size:13px;
+}
+.controls {
+  display:flex; gap:8px; padding:12px 16px;
+  background: var(--surface); border-top:1px solid var(--border);
+  flex-shrink:0;
+}
+select.btn { appearance:none; padding-right:28px; }
+.connection-dot {
+  width:8px; height:8px; border-radius:50%; background: var(--accent);
+  animation: pulse 2s infinite;
+}
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="main">
+    <div class="topbar">
+      <div class="connection-dot" id="dot"></div>
+      <h1 id="title">{{ title }}</h1>
+      <span class="badge" id="liveBadge">LIVE</span>
+      <span class="spacer"></span>
+      <span style="font-size:12px;color:var(--muted)" id="clock">00:00:00</span>
+      <button class="btn danger" onclick="stop()">⏹ Stop</button>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><div class="label">Latence estimée</div><div class="value green" id="latency">--</div></div>
+      <div class="stat"><div class="label">Buffer</div><div class="value" id="buffer">--</div></div>
+      <div class="stat"><div class="label">Résolution</div><div class="value" id="res">--</div></div>
+      <div class="stat"><div class="label">FPS</div><div class="value" id="fps">--</div></div>
+      <div class="stat"><div class="label">Drops</div><div class="value" id="drops">--</div></div>
+      <div class="stat"><div class="label">Codec</div><div class="value" id="codec">--</div></div>
+      <div class="stat"><div class="label">Décodeur</div><div class="value" id="hwdec">--</div></div>
+      <div class="stat"><div class="label">Débit</div><div class="value" id="bitrate">--</div></div>
+    </div>
+
+    <div class="video-area">
+      🎬 La vidéo s'affiche dans la fenêtre mpv
+    </div>
+
+    <div class="controls">
+      <button class="btn" onclick="cmd('pause')">⏯ Pause</button>
+      <select class="btn" id="quality" onchange="cmd('quality', this.value)">
+        <option value="best">Auto (best)</option>
+        <option value="1080p">1080p</option>
+        <option value="720p">720p</option>
+        <option value="480p">480p</option>
+        <option value="360p">360p</option>
+      </select>
+      <span class="spacer"></span>
+      <span style="font-size:11px;color:var(--muted)">mpv VideoToolbox</span>
+    </div>
+  </div>
+
+  <div class="chat">
+    <div class="chat-header">💬 Live Chat</div>
+    <div class="chat-messages" id="chatMessages">
+      <div class="chat-placeholder">Connexion au chat...</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const ws = new WebSocket(`ws://${location.host}/ws`);
+let startTime = Date.now();
+let stats = {};
+let chatCount = 0;
+
+ws.onopen = () => {
+  document.getElementById('dot').style.background = 'var(--accent)';
+};
+
+ws.onclose = () => {
+  document.getElementById('dot').style.background = 'var(--danger)';
+  document.getElementById('liveBadge').textContent = 'OFF';
+  document.getElementById('liveBadge').classList.add('off');
+};
+
+ws.onmessage = (e) => {
+  const msg = JSON.parse(e.data);
+  if (msg.type === 'stats') {
+    stats = msg.data;
+    updateStats(msg.data);
+  } else if (msg.type === 'chat') {
+    updateChat(msg.data);
+  } else if (msg.type === 'title') {
+    document.getElementById('title').textContent = msg.data;
+    document.title = msg.data;
+  }
+};
+
+function updateStats(s) {
+  const latency = s.cache_duration ? (s.cache_duration + 2).toFixed(1) + 's' : '--';
+  document.getElementById('latency').textContent = latency;
+  
+  const buf = s.cache_duration ? s.cache_duration.toFixed(1) + 's' : '--';
+  const bufEl = document.getElementById('buffer');
+  bufEl.textContent = buf;
+  bufEl.className = 'value ' + (s.cache_duration > 20 ? 'red' : s.cache_duration > 8 ? 'yellow' : 'green');
+  
+  document.getElementById('res').textContent = s.resolution || '--';
+  document.getElementById('fps').textContent = s.fps ? s.fps.toFixed(1) : '--';
+  document.getElementById('drops').textContent = s.dropped_frames || '0';
+  document.getElementById('codec').textContent = s.video_codec || '--';
+  document.getElementById('hwdec').textContent = s.hwdec || '--';
+  
+  const br = s.bitrate ? (s.bitrate / 1000).toFixed(1) + ' Mbps' : '--';
+  document.getElementById('bitrate').textContent = br;
+}
+
+function updateChat(messages) {
+  const container = document.getElementById('chatMessages');
+  if (chatCount === 0) container.innerHTML = '';
+  
+  messages.forEach(m => {
+    chatCount++;
+    const div = document.createElement('div');
+    div.className = 'chat-msg';
+    const d = new Date(m.time * 1000);
+    div.innerHTML = `<span class="time">${d.toLocaleTimeString()}</span>${esc(m.text)}`;
+    container.appendChild(div);
+  });
+  
+  container.scrollTop = container.scrollHeight;
+}
+
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function cmd(action, value) {
+  ws.send(JSON.stringify({ action, ...(value && { quality: value }) }));
+}
+
+function stop() {
+  fetch('/api/command', { method:'POST', body:JSON.stringify({action:'stop'}) });
+  setTimeout(() => location.reload(), 500);
+}
+
+// Horloge
+setInterval(() => {
+  const elapsed = Math.floor((Date.now() - startTime) / 1000);
+  const h = Math.floor(elapsed / 3600).toString().padStart(2,'0');
+  const m = Math.floor((elapsed % 3600) / 60).toString().padStart(2,'0');
+  const s = (elapsed % 60).toString().padStart(2,'0');
+  document.getElementById('clock').textContent = `${h}:${m}:${s}`;
+}, 1000);
+</script>
+</body>
+</html>
