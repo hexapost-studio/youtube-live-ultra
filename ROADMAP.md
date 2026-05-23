@@ -29,12 +29,23 @@
 - [ ] Multi-edge download (3 CDN edges en parallèle)
 - [ ] Neural upscale 720p→1080p (CoreML/Metal)
 
-## v2.0 — Go rewrite
-- [ ] Binaire unique (go build)
-- [ ] Dashboard HTML embeddé
-- [ ] Zero dépendances runtime
-- [ ] Cross-compilation triviale
-- [ ] API gRPC pour contrôle distant
+## v2.0 — Go rewrite (conditionnel)
+
+**⚠️ Pas avant d'avoir 100+ utilisateurs actifs.**
+
+Le portage Go est dans la roadmap parce que 1933 lignes de Bash approchent
+le plafond de maintenabilité. Mais un rewrite complet coûte cher et les gains
+sont marginaux pour un outil qui passe 99.9% du temps en I/O réseau et GPU.
+
+Go aurait du sens si :
+- [ ] 100+ utilisateurs rapportent des bugs (nécessite une communauté)
+- [ ] On veut un `.exe` Windows natif (Go cross-compile)
+- [ ] On veut embarquer le dashboard HTML dans le binaire
+- [ ] On veut une API gRPC pour du contrôle distant
+- [ ] La complexité du Bash dépasse 3000 lignes
+
+En attendant, `ylu` (Python stdlib, 350 lignes) couvre déjà 80% des cas.
+Priorité v1.1 → v1.3 : features et robustesse, pas de rewrite.
 
 ## Idées futures
 - [ ] Intégration OBS (source basse latence)
