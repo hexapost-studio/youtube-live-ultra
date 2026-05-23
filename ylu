@@ -37,6 +37,20 @@ def detect_os():
     return (s.lower(), m)
 
 OS_NAME, OS_ARCH = detect_os()
+SANDBOX_AVAILABLE = False
+SANDBOX_METHOD = ""
+
+# Détection sandbox
+if OS_NAME == "macos" and shutil.which("sandbox-exec"):
+    SANDBOX_AVAILABLE = True
+    SANDBOX_METHOD = "sandbox-exec"
+elif OS_NAME in ("linux", "wsl"):
+    if shutil.which("firejail"):
+        SANDBOX_AVAILABLE = True
+        SANDBOX_METHOD = "firejail"
+    elif shutil.which("bwrap"):
+        SANDBOX_AVAILABLE = True
+        SANDBOX_METHOD = "bwrap"
 
 def mpv_hwdec_args():
     """Detect best hardware decode args."""
@@ -71,6 +85,7 @@ def build_parser():
     w.add_argument("--mode", choices=["standard","ultra","direct","resilient"], default="standard")
     w.add_argument("--dry-run", action="store_true")
     w.add_argument("--verbose", "-v", action="store_true")
+    w.add_argument("--sandbox", action="store_true", help="Lancer mpv en sandbox")
 
     # dashboard
     d = sub.add_parser("dashboard", help="Dashboard web (stats + chat)")
@@ -126,9 +141,9 @@ def cmd_watch(args):
 
     # Try streamlink first, then yt-dlp, then mpv --ytdl
     strategies = [
-        lambda: _launch_streamlink(args.url, mpv_args, s["edge"]),
+        lambda: _launch_streamlink(args.url, mpv_args, s["edge"], sandbox=args.sandbox),
         lambda: _launch_ytdlp_pipe(args.url, mpv_args),
-        lambda: _launch_mpv_ytdl(args.url, mpv_args),
+        lambda: _launch_mpv_ytdl(args.url, mpv_args, sandbox=args.sandbox),
     ]
 
     if args.mode == "resilient":
@@ -147,22 +162,45 @@ def cmd_watch(args):
                     print("   ❌ All strategies failed.")
                     sys.exit(1)
 
-def _launch_streamlink(url, mpv_args, edge):
+def _launch_streamlink(url, mpv_args, edge, sandbox=False):
     """Streamlink → mpv."""
     player_args = " ".join(mpv_args)
     cmd = ["streamlink", "--loglevel", "info", "--hls-live-edge", str(edge),
            "--stream-segment-threads", "3", "--ringbuffer-size", "64M",
            "--retry-max", "5", "--retry-streams", "3",
            url, "best", "--player", "mpv", "--player-args", player_args, "--player-no-close"]
+    if sandbox and SANDBOX_AVAILABLE:
+        os.execvp(SANDBOX_METHOD.split()[0], [SANDBOX_METHOD] + cmd if SANDBOX_METHOD == "firejail" else cmd)
     os.execvp("streamlink", cmd)
+
+def _launch_mpv_ytdl(url, mpv_args, sandbox=False):
+    """mpv --ytdl=yes."""
+    cmd = ["mpv", "--ytdl=yes", "--ytdl-format=bestvideo+bestaudio/best"] + mpv_args + [url]
+    if sandbox and SANDBOX_AVAILABLE:
+        _sandbox_exec(cmd)
+    os.execvp("mpv", cmd)
 
 def _launch_ytdlp_pipe(url, mpv_args):
     """yt-dlp pipe → mpv."""
-    ytdlp = subprocess.Popen(
+    subprocess.Popen(
         ["yt-dlp", "-o", "-", "--format", "bestvideo+bestaudio/best",
          "--extractor-args", "youtube:player_client=android,web", url],
         stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
     os.execvp("mpv", ["mpv"] + mpv_args + ["-"])
+
+def _sandbox_exec(cmd):
+    """Execute command in sandbox."""
+    if SANDBOX_METHOD == "firejail":
+        os.execvp("firejail", ["firejail", "--quiet", "--net=none", "--noprofile",
+                                "--caps.drop=all", "--nonewprivs", "--seccomp",
+                                "--tmpfs=/tmp"] + cmd)
+    elif SANDBOX_METHOD == "bwrap":
+        os.execvp("bwrap", ["bwrap", "--ro-bind", "/usr", "/usr",
+                            "--ro-bind", "/lib", "/lib", "--ro-bind", "/lib64", "/lib64",
+                            "--ro-bind", "/bin", "/bin", "--ro-bind", "/etc", "/etc",
+                            "--dev", "/dev", "--dev-bind", "/dev/dri", "/dev/dri",
+                            "--tmpfs", "/tmp", "--unshare-all", "--share-net",
+                            "--die-with-parent"] + cmd)
 
 def _launch_mpv_ytdl(url, mpv_args):
     """mpv --ytdl=yes."""
