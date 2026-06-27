@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] - branche `go`
+
+### Added
+- **Support Windows natif** pour la version Go (`ylu.exe`), sans WSL2.
+- `ipc_unix.go` / `ipc_windows.go` : IPC mpv abstrait par build-tags — socket Unix
+  sur macOS/Linux, *named pipe* (`\\.\pipe\...`) sur Windows (sans dépendance tierce).
+- Décodage GPU `d3d11va` détecté automatiquement sur Windows.
+- CI : tests Go exécutés aussi sur `windows-latest` ; cross-compile `windows/arm64`.
+- `bootstrap.ps1` : installe mpv/streamlink/yt-dlp via winget puis compile le
+  binaire natif ; repli WSL2 via `-Wsl`.
+
+### Changed
+- Watchdog mpv portable : supervision via goroutine + `cmd.Wait()` au lieu des
+  appels Unix `syscall.Wait4` / `syscall.Kill` (compile désormais sur Windows).
+- Chemins IPC dérivés de `os.TempDir()` (Unix) au lieu de `/tmp` codé en dur.
+
 ## [1.0.0] - 2026-05-22
 
 ### Added

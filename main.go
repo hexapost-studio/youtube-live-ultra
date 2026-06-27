@@ -11,7 +11,6 @@ import (
 	"os/signal"
 	"runtime"
 	"strings"
-	"syscall"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -137,33 +136,42 @@ func launchMpvYtdl(url string, mpvArgs []string, sandbox bool) error {
 // ─── RESILIENT ──────────────────────────────────────────────────────────────
 
 func launchResilient(url string, mpvArgs []string, sandbox bool) {
-	ipc := fmt.Sprintf("/tmp/mpv-ylu-%d", os.Getpid())
+	ipc := ipcPath("ylu")
 	args := append([]string{"mpv", "--input-ipc-server=" + ipc, "--ytdl=yes",
 		"--ytdl-format=bestvideo+bestaudio/best"}, mpvArgs...)
 	args = append(args, url)
 	cmd := exec.Command(args[0], args[1:]...)
 	cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
 	if sandbox { cmd = sandboxWrap(cmd) }
-	cmd.Start()
+	if err := cmd.Start(); err != nil {
+		fmt.Fprintf(os.Stderr, "❌ failed to start mpv: %v\n", err); os.Exit(1)
+	}
 	fmt.Printf("🛡️ Watchdog IPC: %s\n", ipc)
-	watchdog(cmd.Process.Pid, ipc, url, mpvArgs, sandbox)
+	watchdog(cmd, ipc, url, mpvArgs, sandbox)
 }
 
-func watchdog(pid int, ipc, url string, mpvArgs []string, sandbox bool) {
+// watchdog supervises mpv portably: a goroutine reaps the process (no Unix
+// syscall.Wait4) and the IPC channel (Unix socket / Windows named pipe) detects
+// freezes by polling time-pos.
+func watchdog(cmd *exec.Cmd, ipc, url string, mpvArgs []string, sandbox bool) {
+	exited := make(chan struct{})
+	go func() { cmd.Wait(); close(exited) }()
+
 	var lastPos *float64
 	frozen := 0
 	for {
-		time.Sleep(3 * time.Second)
-		var wstatus syscall.WaitStatus
-		_, err := syscall.Wait4(pid, &wstatus, syscall.WNOHANG, nil)
-		if err != nil || wstatus.Exited() {
-			code := wstatus.ExitStatus()
+		select {
+		case <-exited:
+			code := 0
+			if cmd.ProcessState != nil { code = cmd.ProcessState.ExitCode() }
 			if code == 0 { return }
-			fmt.Printf("⚠ mpv crashed (exit %d) — restarting...\n", code)
+			fmt.Printf("⚠ mpv exited (code %d) — restarting...\n", code)
 			launchStreamlink(url, mpvArgs, sandbox)
 			return
+		case <-time.After(3 * time.Second):
 		}
-		conn, err := net.DialTimeout("unix", ipc, 500*time.Millisecond)
+
+		conn, err := dialIPC(ipc, 500*time.Millisecond)
 		if err != nil { continue }
 		fmt.Fprintf(conn, `{"command":["get_property","time-pos"]}`+"\n")
 		var buf [4096]byte
@@ -175,7 +183,7 @@ func watchdog(pid int, ipc, url string, mpvArgs []string, sandbox bool) {
 				frozen++
 				if frozen >= 3 {
 					fmt.Printf("❌ mpv frozen — restarting...\n")
-					syscall.Kill(pid, syscall.SIGTERM)
+					cmd.Process.Kill()
 					time.Sleep(time.Second)
 					launchStreamlink(url, mpvArgs, sandbox)
 					return
@@ -196,7 +204,7 @@ func cmdDashboard() {
 	if flags.NArg() < 1 { fmt.Fprintln(os.Stderr, "Usage: ylu dashboard <URL>"); os.Exit(1) }
 	url := flags.Arg(0)
 
-	ipc := fmt.Sprintf("/tmp/mpv-dash-%d", os.Getpid())
+	ipc := ipcPath("dash")
 	args := append([]string{"mpv", "--input-ipc-server=" + ipc, "--ytdl=yes",
 		"--ytdl-format=bestvideo+bestaudio/best"}, buildMpvArgs(*mode)...)
 	args = append(args, url)
@@ -217,7 +225,7 @@ func cmdDashboard() {
 	addr := fmt.Sprintf("127.0.0.1:%d", *port)
 	fmt.Printf("🌐 http://%s\n", addr)
 	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
+	signal.Notify(sig, shutdownSignals...)
 	go func() { <-sig; os.Exit(0) }()
 	http.ListenAndServe(addr, nil)
 }
@@ -273,7 +281,7 @@ func cmdTUI() {
 	if flags.NArg() < 1 { fmt.Fprintln(os.Stderr, "Usage: ylu tui <URL>"); os.Exit(1) }
 	url := flags.Arg(0)
 
-	ipc := fmt.Sprintf("/tmp/mpv-tui-%d", os.Getpid())
+	ipc := ipcPath("tui")
 	args := append([]string{"mpv", "--input-ipc-server=" + ipc, "--ytdl=yes",
 		"--ytdl-format=bestvideo+bestaudio/best"}, buildMpvArgs(*mode)...)
 	args = append(args, url)
@@ -372,7 +380,7 @@ func cmdOptimize() {
 // ─── MPV IPC HELPERS ────────────────────────────────────────────────────────
 
 func sendMPVCmd(ipc string, cmd ...string) {
-	conn, err := net.Dial("unix", ipc)
+	conn, err := dialIPC(ipc, 0)
 	if err != nil { return }
 	defer conn.Close()
 	req, _ := json.Marshal(map[string]interface{}{"command": cmd})
@@ -393,7 +401,7 @@ func getMPVStats(ipc string) map[string]interface{} {
 }
 
 func getMPVProp(ipc, prop string) interface{} {
-	conn, err := net.DialTimeout("unix", ipc, 300*time.Millisecond)
+	conn, err := dialIPC(ipc, 300*time.Millisecond)
 	if err != nil { return nil }
 	defer conn.Close()
 	fmt.Fprintf(conn, `{"command":["get_property","%s"]}`, prop)
@@ -423,6 +431,8 @@ func sandboxWrap(cmd *exec.Cmd) *exec.Cmd {
 		} else {
 			fmt.Fprintln(os.Stderr, "⚠ --sandbox requested but no firejail/bwrap found.")
 		}
+	case "windows":
+		fmt.Fprintln(os.Stderr, "⚠ --sandbox not supported on Windows; running unsandboxed.")
 	}
 	return cmd
 }
@@ -445,6 +455,10 @@ func detectHWDec() []string {
 			return []string{"--hwdec=vaapi", "--vo=gpu-next"}
 		}
 		return []string{"--hwdec=auto-safe", "--vo=gpu-next"}
+	}
+	if runtime.GOOS == "windows" {
+		// d3d11va covers H.264/HEVC on virtually all Windows GPUs.
+		return []string{"--hwdec=d3d11va", "--vo=gpu-next"}
 	}
 	return []string{"--hwdec=auto-safe", "--vo=gpu-next"}
 }

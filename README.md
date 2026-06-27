@@ -410,9 +410,14 @@ Testé sur :
 | macOS 13+ (Intel) | ✅ Complet | VideoToolbox |
 | Linux (Ubuntu 22.04+, Arch) | ✅ Complet | VAAPI / VDPAU / Vulkan |
 | Linux (autres distros) | ⚠️ Testé partiellement | auto-safe |
-| WSL2 (Windows 10/11) | ✅ Supporté | VAAPI (via D3D12/Mesa) |
+| Windows natif (10/11) | ✅ Complet *(branche `go`)* | d3d11va + gpu-next |
+| WSL2 (Windows 10/11) | ✅ Supporté *(scripts Bash)* | VAAPI (via D3D12/Mesa) |
 | FreeBSD | ⚠️ Non testé | auto-safe |
-| Windows natif | ❌ Utilise WSL2 | via `bootstrap.ps1` |
+
+> **Windows natif** : la version Go (`ylu.exe`) tourne sans WSL2. IPC mpv via
+> *named pipe*, décodage `d3d11va`. Build : `.\bootstrap.ps1` (installe mpv/
+> streamlink/yt-dlp via winget puis compile le binaire), ou `go build -o ylu.exe .`
+> sur la branche `go`. Repli WSL2 : `.\bootstrap.ps1 -Wsl`.
 
 ### Commandes
 ```bash
