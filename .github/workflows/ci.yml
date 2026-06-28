@@ -2,13 +2,14 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, go]
   pull_request:
-    branches: [main]
+    branches: [main, go]
 
 jobs:
   lint:
     name: Lint (shellcheck)
+    if: github.ref != 'refs/heads/go'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -22,6 +23,7 @@ jobs:
 
   syntax-bash:
     name: Syntax (bash -n)
+    if: github.ref != 'refs/heads/go'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -29,6 +31,7 @@ jobs:
 
   syntax-python:
     name: Syntax (Python)
+    if: github.ref != 'refs/heads/go'
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
@@ -39,6 +42,7 @@ jobs:
 
   test:
     name: Tests (bats)
+    if: github.ref != 'refs/heads/go'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -48,6 +52,7 @@ jobs:
 
   test-macos:
     name: Tests (macOS)
+    if: github.ref != 'refs/heads/go'
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -56,6 +61,7 @@ jobs:
 
   version:
     name: Version check
+    if: github.ref != 'refs/heads/go'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -66,6 +72,7 @@ jobs:
 
   ylu-cli:
     name: ylu CLI (smoke)
+    if: github.ref != 'refs/heads/go'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
