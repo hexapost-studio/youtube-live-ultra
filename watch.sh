@@ -39,7 +39,7 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-[ -z "${URL:-}" ] && { usage; exit 0; }
+[ -z "${URL:-}" ] && { usage; exit 1; }  # URL requise : argument manquant = erreur
 
 # Nettoyer l'URL (échappements shell accidentels)
 URL="${URL//\\/}"

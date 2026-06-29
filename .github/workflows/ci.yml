@@ -11,7 +11,7 @@ jobs:
     name: Lint (shellcheck)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Run shellcheck
         uses: ludeeus/action-shellcheck@master
         with:
@@ -24,7 +24,7 @@ jobs:
     name: Syntax (bash -n)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - run: for f in watch*.sh scripts/*.sh lib/*.sh install.sh; do bash -n "$f" || exit 1; done
 
   syntax-python:
@@ -34,14 +34,14 @@ jobs:
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - run: python3 -m py_compile dashboard/server.py dashboard/tui.py ylu
 
   test:
     name: Tests (bats)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - run: sudo apt-get update && sudo apt-get install -y bats
       - run: bats --recursive tests/unit/
       - run: bats --recursive tests/integration/ || true
@@ -50,7 +50,7 @@ jobs:
     name: Tests (macOS)
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - run: brew install bats-core
       - run: bats --recursive tests/unit/
 
@@ -58,7 +58,7 @@ jobs:
     name: Version check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - run: |
           VERSION=$(cat VERSION)
           echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$' || exit 1
@@ -68,7 +68,7 @@ jobs:
     name: ylu CLI (smoke)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - run: python3 ylu --version
       - run: python3 ylu --help
       - run: python3 ylu watch --help

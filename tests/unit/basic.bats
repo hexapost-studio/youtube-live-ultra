@@ -33,7 +33,8 @@ setup() {
 }
 
 @test "watch.sh detects missing streamlink" {
-    PATH="/nonexistent" run "$PROJECT_DIR/watch.sh" "https://youtube.com/watch?v=test"
+    # PATH minimal : bash/env/coreutils présents (shebang OK) mais streamlink absent
+    PATH="/usr/bin:/bin" run "$PROJECT_DIR/watch.sh" "https://youtube.com/watch?v=test"
     [ "$status" -eq 1 ]
     [[ "$output" == *"streamlink"* ]]
 }
@@ -76,7 +77,7 @@ setup() {
 
 @test "watch-resilient.sh shows usage with --help" {
     run "$PROJECT_DIR/watch-resilient.sh" --help
-    [ "$status" -eq 1 ]
+    [ "$status" -eq 0 ]  # --help est une demande explicite, pas une erreur (convention CLI)
     [[ "$output" == *"Usage"* ]]
 }
 
