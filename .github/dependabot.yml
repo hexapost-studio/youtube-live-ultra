@@ -1,0 +1,29 @@
+version: 2
+# Dependabot lit ce fichier sur la branche par défaut (main) mais peut cibler
+# d'autres branches via `target-branch`.
+updates:
+  # GitHub Actions — branche main
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "ci"
+
+  # GitHub Actions — branche go
+  - package-ecosystem: github-actions
+    directory: "/"
+    target-branch: go
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "ci(go)"
+
+  # Modules Go (go.mod vit sur la branche go)
+  - package-ecosystem: gomod
+    directory: "/"
+    target-branch: go
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "deps(go)"
