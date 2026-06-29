@@ -1,0 +1,31 @@
+name: CodeQL
+
+# Analyse de sécurité du code Go (la source vit sur la branche `go`).
+on:
+  push:
+    branches: [go]
+  pull_request:
+    branches: [go]
+  schedule:
+    - cron: '27 3 * * 1'  # hebdo, lundi 03:27 UTC
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: Analyze (go)
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write  # requis pour publier les alertes CodeQL
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: go
+      - uses: github/codeql-action/autobuild@v3
+      - uses: github/codeql-action/analyze@v3

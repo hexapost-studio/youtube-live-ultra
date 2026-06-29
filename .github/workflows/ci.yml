@@ -6,15 +6,19 @@ on:
   pull_request:
     branches: [main, go]
 
+# Moindre privilège : la CI ne fait que lire le dépôt.
+permissions:
+  contents: read
+
 jobs:
   lint:
     name: Lint (shellcheck)
     if: github.ref != 'refs/heads/go'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Run shellcheck
-        uses: ludeeus/action-shellcheck@master
+        uses: ludeeus/action-shellcheck@2.0.0  # épinglé (pas @master) — supply chain
         with:
           scandir: '.'
           format: tty
@@ -26,7 +30,7 @@ jobs:
     if: github.ref != 'refs/heads/go'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - run: for f in watch*.sh scripts/*.sh lib/*.sh install.sh; do bash -n "$f" || exit 1; done
 
   syntax-python:
@@ -37,7 +41,7 @@ jobs:
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - run: python3 -m py_compile dashboard/server.py dashboard/tui.py ylu
 
   test:
@@ -45,7 +49,7 @@ jobs:
     if: github.ref != 'refs/heads/go'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - run: sudo apt-get update && sudo apt-get install -y bats
       - run: bats --recursive tests/unit/
       - run: bats --recursive tests/integration/ || true
@@ -55,7 +59,7 @@ jobs:
     if: github.ref != 'refs/heads/go'
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - run: brew install bats-core
       - run: bats --recursive tests/unit/
 
@@ -64,7 +68,7 @@ jobs:
     if: github.ref != 'refs/heads/go'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - run: |
           VERSION=$(cat VERSION)
           echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$' || exit 1
@@ -75,7 +79,7 @@ jobs:
     if: github.ref != 'refs/heads/go'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - run: python3 ylu --version
       - run: python3 ylu --help
       - run: python3 ylu watch --help
@@ -88,7 +92,7 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-go@v5
         with:
           go-version: '1.21'
@@ -101,7 +105,7 @@ jobs:
     if: github.ref == 'refs/heads/go'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-go@v5
         with:
           go-version: '1.21'
