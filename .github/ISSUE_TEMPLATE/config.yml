@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 Question / aide à l'usage
+    url: https://github.com/hexapost-studio/youtube-live-ultra/blob/main/SUPPORT.md
+    about: Avant d'ouvrir une issue, consulte le guide de support.
+  - name: 🔒 Vulnérabilité de sécurité
+    url: https://github.com/hexapost-studio/youtube-live-ultra/blob/main/SECURITY.md
+    about: Ne pas ouvrir d'issue publique — suis la politique de sécurité.

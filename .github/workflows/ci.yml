@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main]
 
+# Moindre privilège : la CI ne fait que lire le dépôt.
+permissions:
+  contents: read
+
 jobs:
   lint:
     name: Lint (shellcheck)
@@ -13,7 +17,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Run shellcheck
-        uses: ludeeus/action-shellcheck@master
+        uses: ludeeus/action-shellcheck@2.0.0  # épinglé (pas @master) — supply chain
         with:
           scandir: '.'
           format: tty

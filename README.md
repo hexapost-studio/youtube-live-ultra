@@ -9,6 +9,13 @@
 
 **Tu n'installes que ce dont tu as besoin.** 4 tiers indépendants, du CLI pur au dashboard web.
 
+> [!IMPORTANT]
+> **Deux implémentations dans ce dépôt :**
+> - **`main`** (cette branche) — scripts **Bash/Python**, pour **macOS & Linux** (et Windows via WSL2).
+> - **[`go`](https://github.com/hexapost-studio/youtube-live-ultra/tree/go)** — binaire unique **`ylu`** (Go), notamment le **Windows natif sans WSL2**.
+>
+> 🪟 **Sur Windows ?** Télécharge `ylu.exe` depuis les **[Releases](https://github.com/hexapost-studio/youtube-live-ultra/releases)** (ou lance `bootstrap.ps1`). Détails : [branche `go`](https://github.com/hexapost-studio/youtube-live-ultra/tree/go#-windows-natif-sans-wsl2).
+
 ---
 
 ## 🎯 Vision produit
