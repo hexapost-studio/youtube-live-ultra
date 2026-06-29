@@ -39,11 +39,23 @@ cd youtube-live-ultra
 ./install.sh --all         # Tout installer
 ```
 
-**Via Homebrew (une seule commande) :**
+**Via Homebrew (macOS/Linux, une seule commande) :**
 ```bash
 brew install hexapost-studio/tap/youtube-live-ultra
 youtube-live-watch "https://www.youtube.com/watch?v=XXXXXXXXXXX"
 ```
+
+**🪟 Windows (natif, sans WSL2)** — version Go `ylu.exe` :
+```powershell
+# PowerShell — télécharge le script puis lance-le
+irm https://raw.githubusercontent.com/hexapost-studio/youtube-live-ultra/go/bootstrap.ps1 -OutFile bootstrap.ps1
+.\bootstrap.ps1
+```
+`bootstrap.ps1` télécharge `ylu.exe` depuis la dernière [release](https://github.com/hexapost-studio/youtube-live-ultra/releases) (ou le **compile** en repli) et installe `mpv`/`streamlink`/`yt-dlp` (Scoop/Choco/winget). Puis :
+```powershell
+.\ylu.exe watch --mode ultra "https://www.youtube.com/watch?v=XXXXXXXXXXX"
+```
+Repli WSL2 : `.\bootstrap.ps1 -Wsl`.
 
 ---
 
@@ -415,9 +427,11 @@ Testé sur :
 | FreeBSD | ⚠️ Non testé | auto-safe |
 
 > **Windows natif** : la version Go (`ylu.exe`) tourne sans WSL2. IPC mpv via
-> *named pipe*, décodage `d3d11va`. Build : `.\bootstrap.ps1` (installe mpv/
-> streamlink/yt-dlp via winget puis compile le binaire), ou `go build -o ylu.exe .`
-> sur la branche `go`. Repli WSL2 : `.\bootstrap.ps1 -Wsl`.
+> *named pipe*, décodage `d3d11va`. Installation via `.\bootstrap.ps1` : télécharge
+> `ylu.exe` depuis la dernière release (repli : compile avec Go), et installe
+> mpv/streamlink/yt-dlp (Scoop/Choco/winget). Forcer la compilation : `.\bootstrap.ps1 -Build`.
+> Repli WSL2 : `.\bootstrap.ps1 -Wsl`. Les binaires de release sont produits par
+> `.github/workflows/release.yml` (tag `v*`).
 
 ### Commandes
 ```bash

@@ -1,0 +1,45 @@
+name: Release
+
+# Publie les binaires précompilés (dont ylu.exe Windows) sur une GitHub Release.
+# Déclenche en poussant un tag : git tag v1.0.0 && git push origin v1.0.0
+# (le tag doit pointer sur un commit de la branche `go`, qui contient le code Go).
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Cross-compile (windows / linux / macos)
+        run: |
+          mkdir -p dist
+          GOOS=windows GOARCH=amd64 go build -trimpath -o dist/ylu-windows-amd64.exe .
+          GOOS=windows GOARCH=arm64 go build -trimpath -o dist/ylu-windows-arm64.exe .
+          GOOS=linux   GOARCH=amd64 go build -trimpath -o dist/ylu-linux-amd64 .
+          GOOS=linux   GOARCH=arm64 go build -trimpath -o dist/ylu-linux-arm64 .
+          GOOS=darwin  GOARCH=arm64 go build -trimpath -o dist/ylu-darwin-arm64 .
+          GOOS=darwin  GOARCH=amd64 go build -trimpath -o dist/ylu-darwin-amd64 .
+          (cd dist && sha256sum * > SHA256SUMS.txt)
+
+      # Artefacts téléchargeables même hors release (run manuel)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ylu-binaries
+          path: dist/*
+
+      # Publication de la Release uniquement sur un tag v*
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${{ github.ref_name }}" dist/* --generate-notes --title "ylu ${{ github.ref_name }}"

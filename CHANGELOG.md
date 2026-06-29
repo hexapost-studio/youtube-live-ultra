@@ -15,6 +15,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI : tests Go exécutés aussi sur `windows-latest` ; cross-compile `windows/arm64`.
 - `bootstrap.ps1` : installe mpv/streamlink/yt-dlp via winget puis compile le
   binaire natif ; repli WSL2 via `-Wsl`.
+- **Installation Windows facile + résiliente** : `bootstrap.ps1` télécharge
+  désormais `ylu.exe` depuis la dernière GitHub Release (repli build-from-source) ;
+  mpv installé via Scoop/Choco (vrai `mpv.exe`, plus `mpv.net`) ; PATH rafraîchi ;
+  flag `-Build` pour forcer la compilation.
+- `.github/workflows/release.yml` : publie les binaires précompilés
+  (windows amd64/arm64, linux, macos + SHA256SUMS) sur une GitHub Release au tag `v*`.
+- README : section « Installation » Windows en première page (download `ylu.exe`).
 
 ### Changed
 - Watchdog mpv portable : supervision via goroutine + `cmd.Wait()` au lieu des
